@@ -2,6 +2,15 @@
 
 /**
  * @file
+ * Generate callbacks for the redirect module.
+ */
+
+use Drupal\Component\Utility\Random;
+use Drupal\devel_generate\DevelGenerateBase;
+use Drupal\redirect\Entity\Redirect;
+
+/**
+ * @file
  * Devel generate integration for the redirect module.
  */
 
@@ -55,7 +64,9 @@ function redirect_generate_batch_delete(array &$context) {
 
   $limit = 20;
   $rids = db_query_range("SELECT rid FROM {redirect} WHERE rid > :rid ORDER BY rid", 0, $limit, array(':rid' => $context['sandbox']['current_rid']))->fetchCol();
-  redirect_delete_multiple($rids);
+  foreach (redirect_repository()->loadMultiple($rids) as $redirect) {
+    $redirect->delete();
+  }
 
   // Update our progress information.
   $context['sandbox']['progress'] += count($rids);
@@ -86,42 +97,47 @@ function redirect_generate_batch_generate($num, array &$context) {
 
   $limit = 20;
   $types = array_keys(redirect_status_code_options());
-  $languages = module_exists('locale') ? array_keys(locale_language_list('name')) : array();
+  $languages = \Drupal::moduleHandler()->moduleExists('locale') ? array_keys(\Drupal::languageManager()->getLanguages()) : array();
 
   for ($i = 0; $i < min($limit, $context['sandbox']['max'] - $context['sandbox']['progress']); $i++) {
     $rand = mt_rand(0, 100);
 
-    $redirect = new stdClass();
-    redirect_object_prepare($redirect);
-    $redirect->source = _redirect_generate_url();
-    $redirect->devel_generate = TRUE;
+    $redirect = Redirect::create();
+
+    $source = _redirect_generate_url();
+    $source_options = array();
+    $redirect_options = array();
 
     if ($context['sandbox']['nids'] && $rand >= 40) {
-      $redirect->redirect = 'node/'. array_rand($context['sandbox']['nids']);
+      $redirect_target = 'node/' . array_rand($context['sandbox']['nids']);
     }
     else {
-      $redirect->redirect = _redirect_generate_url(TRUE);
+      $redirect_target = _redirect_generate_url(TRUE);
       if ($rand <= 20) {
-        $redirect->redirect_options['query'] = _redirect_generate_querystring();
+        $redirect_options['query'] = _redirect_generate_querystring();
       }
       if ($rand <= 5) {
-        $redirect->redirect_options['fragment'] = devel_generate_word(mt_rand(4, 8));
+        $redirect_options['fragment'] = DevelGenerateBase::generateWord(mt_rand(4, 8));
       }
     }
 
     if ($rand <= 20) {
-      $redirect->status_code = $types[array_rand($types)];
+      $redirect->setStatusCode($types[array_rand($types)]);
     }
 
     if ($languages && $rand <= 20) {
-      $redirect->language = $languages[array_rand($languages)];
+      $redirect->setLanguage($languages[array_rand($languages)]);
     }
 
+    $query = array();
     if ($rand <= 30) {
-      $redirect->source_options['query'] = _redirect_generate_querystring();
+      $query = _redirect_generate_querystring();
     }
 
-    redirect_save($redirect);
+    $redirect->setSource($source, $query);
+    $redirect->setRedirect($redirect_target);
+
+    $redirect->save();
 
     if (mt_rand(0, 1)) {
       db_update('redirect')
@@ -129,11 +145,11 @@ function redirect_generate_batch_generate($num, array &$context) {
           'count' => mt_rand(1, 500),
           'access' => mt_rand(REQUEST_TIME - 31536000, REQUEST_TIME),
         ))
-        ->condition('rid', $redirect->rid)
+        ->condition('rid', $redirect->id())
         ->execute();
     }
 
-    $context['results'][] = $redirect->rid;
+    $context['results'][] = $redirect->id();
   }
 
   // Update our progress information.
@@ -149,7 +165,7 @@ function redirect_generate_batch_generate($num, array &$context) {
 
 function redirect_generate_batch_finished($success, $results, $operations) {
   if ($success) {
-    drupal_set_message(format_plural(count($results), 'One URL redirect created.', '@count URL redirects created.'));
+    drupal_set_message(\Drupal::translation()->formatPlural(count($results), 'One URL redirect created.', '@count URL redirects created.'));
   }
   else {
     // An error occurred.
@@ -160,8 +176,6 @@ function redirect_generate_batch_finished($success, $results, $operations) {
 }
 
 function _redirect_generate_url($external = FALSE, $max_levels = 2) {
-  module_load_include('inc', 'devel_generate');
-
   $url = array();
   if ($external) {
     $tlds = array('com', 'net', 'org');
@@ -169,14 +183,12 @@ function _redirect_generate_url($external = FALSE, $max_levels = 2) {
   }
   $max_levels = mt_rand($external ? 0 : 1, $max_levels);
   for ($i = 1; $i <= $max_levels; $i++) {
-    $url[] = devel_generate_word(mt_rand(6 / $i, 8));
+    $url[] = DevelGenerateBase::generateWord(mt_rand(6 / $i, 8));
   }
   return implode('/', $url);
 }
 
 function _redirect_generate_querystring() {
-  module_load_include('inc', 'devel_generate');
-
-  $query = array(devel_generate_word(mt_rand(1, 3)) => devel_generate_word(mt_rand(2, 4)));
+  $query = array(DevelGenerateBase::generateWord(mt_rand(1, 3)) => DevelGenerateBase::generateWord(mt_rand(2, 4)));
   return $query;
 }

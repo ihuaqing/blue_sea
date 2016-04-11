@@ -2,14 +2,19 @@
 
 /**
  * @file
- * Redirect field handler for {redirect}.redirect.
+ * Contains Drupal\redirect\Plugin\views\field\FieldRedirectSource.
  */
 
-class redirect_handler_field_redirect_redirect extends views_handler_field {
+namespace Drupal\redirect\Plugin\views\field;
+
+use Drupal\Component\Utility\SafeMarkup;
+use Drupal\views\Plugin\views\field\FieldPluginBase;
+
+class FieldRedirectSource extends FieldPluginBase {
   function construct() {
     parent::construct();
-    $this->additional_fields['redirect'] = 'redirect';
-    $this->additional_fields['redirect_options'] = 'redirect_options';
+    $this->additional_fields['source'] = 'source';
+    $this->additional_fields['source_options'] = 'source_options';
   }
 
   function option_definition() {
@@ -51,19 +56,19 @@ class redirect_handler_field_redirect_redirect extends views_handler_field {
   }
 
   function render($values) {
-    $redirect = $values->{$this->aliases['redirect']};
-    $redirect_options = unserialize($values->{$this->aliases['redirect_options']});
-    $redirect_options['absolute'] = !empty($this->options['absolute']);
+    $source = $values->{$this->aliases['source']};
+    $source_options = unserialize($values->{$this->aliases['source_options']});
+    $source_options['absolute'] = !empty($this->options['absolute']);
 
-    $url = redirect_url($redirect, $redirect_options);
+    $url = redirect_url($source, $source_options);
     $text = !empty($this->options['text']) ? $this->options['text'] : $url;
 
     if (!empty($this->options['alter']['make_link'])) {
       $this->options['alter']['path'] = $url;
-      $this->options['alter']['absolute'] = $redirect_options['absolute'];
+      $this->options['alter']['absolute'] = $source_options['absolute'];
     }
     else {
-      $text = check_plain($text);
+      $text = SafeMarkup::checkPlain($text);
     }
 
     return $text;

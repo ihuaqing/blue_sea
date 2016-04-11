@@ -2,10 +2,15 @@
 
 /**
  * @file
- * Redirect field handler for redirect operations.
+ * Contains Drupal\redirect\Plugin\views\field\FieldRedirectOperations.
  */
 
-class redirect_handler_field_redirect_operations extends views_handler_field {
+namespace Drupal\redirect\Plugin\views\field;
+
+use Drupal\redirect\Entity\Redirect;
+use Drupal\views\Plugin\views\field\FieldPluginBase;
+
+class FieldRedirectOperations extends FieldPluginBase {
   function construct() {
     parent::construct();
     $this->additional_fields['rid'] = 'rid';
@@ -39,18 +44,18 @@ class redirect_handler_field_redirect_operations extends views_handler_field {
 
   function render($values) {
     $rid = $values->{$this->aliases['rid']};
-    $redirect = redirect_load($rid);
+    $redirect = Redirect::load($rid);
     $destination = drupal_get_destination();
-    
+
     $operations = array();
-    if (redirect_access('update', $redirect)) {
+    if ($redirect->access('update')) {
       $operations['edit'] = array(
         'title' => !empty($this->options['edit_text']) ? $this->options['edit_text'] : t('Edit'),
         'href' => 'admin/config/search/redirect/edit/' . $rid,
         'query' => $destination,
       );
     }
-    if (redirect_access('delete', $redirect)) {
+    if ($redirect->access('delete')) {
       $operations['delete'] = array(
         'title' => !empty($this->options['delete_text']) ? $this->options['delete_text'] : t('Delete'),
         'href' => 'admin/config/search/redirect/delete/' . $rid,

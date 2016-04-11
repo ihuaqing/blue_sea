@@ -1,0 +1,14 @@
+services:
+  redirect.repository:
+    class: Drupal\redirect\RedirectRepository
+    arguments: ['@entity.manager', '@database', '@config.factory']
+    tags:
+      - { name: backend_overridable }
+  redirect.checker:
+    class: Drupal\redirect\RedirectChecker
+    arguments: ['@config.factory', '@state', '@flood']
+  redirect.request_subscriber:
+    class: Drupal\redirect\EventSubscriber\RedirectRequestSubscriber
+    arguments: ['@redirect.repository', '@language_manager', '@config.factory', '@redirect.checker', '@router.request_context']
+    tags:
+      - { name: event_subscriber }
